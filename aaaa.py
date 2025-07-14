@@ -1,8 +1,8 @@
 """
-Not updated in availability rooms after checkout or cancel or paid.
+Not updated in availability rooms after checkout and remove paid option in user.
 
 """
-
+import re
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime, timedelta
@@ -124,20 +124,7 @@ class User:
         except Exception as e:
             print(f"Booking failed: {e}")
 
-    # def cancel_booking(self):
-    #     cur = self.conn.cursor()
-    #     cur.execute("SELECT booking_id, room_no, check_in_date FROM booking WHERE userid=%s AND check_out_date IS NULL", (self.userid,))
-    #     bookings = cur.fetchall()
-    #     if not bookings:
-    #         print("No active bookings.")
-    #         return
-    #     print("\nYour Active Bookings:")
-    #     for b in bookings:
-    #         print(f"ID: {b[0]}, Room: {b[1]}, Check-in: {b[2]}")
-    #     bid = int(input("Booking ID to cancel: "))
-    #     cur.execute("DELETE FROM booking WHERE booking_id=%s AND userid=%s", (bid, self.userid))
-    #     self.conn.commit()
-    #     print("Booking canceled and room is now available.")
+
 
     def cancel_booking(self):
         cur = self.conn.cursor()
@@ -182,27 +169,6 @@ class User:
         else:
             print("No bookings found.")
 
-    # def checkout(self):
-    #     cur = self.conn.cursor()
-    #     cur.execute("SELECT booking_id, room_no, check_in_date FROM booking WHERE userid=%s AND check_out_date IS NULL", (self.userid,))
-    #     bookings = cur.fetchall()
-    #     if not bookings:
-    #         print("No active bookings.")
-    #         return
-    #     print("\nYour Active Bookings:")
-    #     for b in bookings:
-    #         print(f"ID: {b[0]}, Room: {b[1]}, Check-in: {b[2]}")
-    #     bid = int(input("Booking ID to checkout: "))
-    #     checkout_date = input("Check-out Date (YYYY-MM-DD): ")
-    #     checkout_date_obj = datetime.strptime(checkout_date, "%Y-%m-%d").date()
-    #     print("Mark payment: 1. Paid  2. Unpaid")
-    #     choice = input("Choose: ")
-    #     status = 'Paid' if choice == '1' else 'Unpaid'
-    #
-    #     cur = self.conn.cursor()
-    #     cur.callproc("checkout_guest", [bid, checkout_date_obj, status, ''])
-    #     self.conn.commit()
-    #     print("Checkout successful.")
 
     def checkout(self):
         cur = self.conn.cursor()
@@ -236,6 +202,22 @@ class User:
 
 
 # Authentication
+
+def is_valid_email(email):
+    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(pattern, email) is not None
+
+def is_strong_password(password):
+    return (
+        len(password) >= 8 and
+        any(c.isdigit() for c in password) and
+        any(c.isupper() for c in password) and
+        any(c.islower() for c in password)
+    )
+
+def is_valid_contact(contact):
+    return contact.isdigit() and len(contact) == 10 and contact[0] in '6789'
+
 def admin_login(connconn):
     uname = input("Admin name: ").strip()
     pwd = input("Password: ").strip()
@@ -253,12 +235,51 @@ def user_register(conn):
     print("\n--- Register New User ---")
     try:
         uname = input("Username: ").strip()
-        email = input("Email: ").strip()
-        pwd = input("Password: ").strip()
-        gender = input("Gender (M/F): ").strip().upper()
-        dob = input("DOB (YYYY-MM-DD): ").strip()
-        contact = input("Contact: ").strip()
+
+        while True:
+            email=input("Email: ").strip()
+            if is_valid_email(email):
+                break
+            print("Invalid email format. Try again.")
+
+        while True:
+            pwd = input("Password: ").strip()
+            if not is_strong_password(pwd):
+                print("Password must be at least 8 characters long and include uppercase, lowercase, and a number.")
+                continue
+
+            repeat_pwd = input("Repeat Password: ").strip()
+            if pwd != repeat_pwd:
+                print("Passwords do not match. Try again.")
+                continue
+
+            break
+
         cur = conn.cursor()
+        cur.execute("SELECT * FROM user WHERE email = %s", (email,))
+        if cur.fetchone():
+            print("Email already registered.")
+            exit()
+        gender = input("Gender (M/F): ").strip().upper()
+
+
+        while True:
+            dob = input("DOB (YYYY-MM-DD): ").strip()
+            try:
+                valid_date = datetime.strptime(dob, "%Y-%m-%d")
+                if valid_date >= datetime.now():
+                    print("Date of birth must be in the past. Please try again.")
+                else:
+                    break
+            except ValueError:
+                print("Invalid date format or non-existent date. Please use YYYY-MM-DD.")
+
+        while True:
+            contact = input("Contact (10-digit mobile number): ").strip()
+            if is_valid_contact(contact):
+                break
+            print("Invalid contact number. It must be 10 digits and start with 6, 7, 8, or 9.")
+
         cur.execute("""
             INSERT INTO user(username, email, password, gender, dob, contact)
             VALUES(%s, %s, %s, %s, %s, %s)
@@ -268,8 +289,35 @@ def user_register(conn):
     except mysql.connector.IntegrityError as e:
         print("Email already exists.")
 
+
+
+
+# def user_register(conn):
+#     print("\n--- Register New User ---")
+#     try:
+#         uname = input("Username: ").strip()
+#         email = input("Email: ").strip()
+#         pwd = input("Password: ").strip()
+#         gender = input("Gender (M/F): ").strip().upper()
+#         dob = input("DOB (YYYY-MM-DD): ").strip()
+#         contact = input("Contact: ").strip()
+#         cur = conn.cursor()
+#         cur.execute("""
+#             INSERT INTO user(username, email, password, gender, dob, contact)
+#             VALUES(%s, %s, %s, %s, %s, %s)
+#         """, (uname, email, pwd, gender, dob, contact))
+#         conn.commit()
+#         print("Registration successful!")
+#     except mysql.connector.IntegrityError as e:
+#         print("Email already exists.")
+
+
 def user_login(conn):
-    email = input("Email: ").strip()
+    while True:
+        email = input("Email: ").strip()
+        if is_valid_email(email):
+            break
+        print("Invalid email format. Try again.")
     pwd = input("Password: ").strip()
     cur = conn.cursor()
     cur.execute("SELECT userid, username FROM user WHERE email=%s AND password=%s", (email, pwd))
@@ -280,6 +328,21 @@ def user_login(conn):
     else:
         print("Invalid login.")
         return None
+
+# def user_login(conn):
+#     email = input("Email: ").strip()
+#     pwd = input("Password: ").strip()
+#     cur = conn.cursor()
+#     cur.execute("SELECT userid, username FROM user WHERE email=%s AND password=%s", (email, pwd))
+#     row = cur.fetchone()
+#     if row:
+#         print(f"\nWelcome {row[1]}!")
+#         return User(conn, row[0], row[1])
+#     else:
+#         print("Invalid login.")
+#         return None
+
+
 
 # Menus
 def main_menu(conn):
