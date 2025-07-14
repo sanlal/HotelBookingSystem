@@ -124,18 +124,50 @@ class User:
         except Exception as e:
             print(f"Booking failed: {e}")
 
+    # def cancel_booking(self):
+    #     cur = self.conn.cursor()
+    #     cur.execute("SELECT booking_id, room_no, check_in_date FROM booking WHERE userid=%s AND check_out_date IS NULL", (self.userid,))
+    #     bookings = cur.fetchall()
+    #     if not bookings:
+    #         print("No active bookings.")
+    #         return
+    #     print("\nYour Active Bookings:")
+    #     for b in bookings:
+    #         print(f"ID: {b[0]}, Room: {b[1]}, Check-in: {b[2]}")
+    #     bid = int(input("Booking ID to cancel: "))
+    #     cur.execute("DELETE FROM booking WHERE booking_id=%s AND userid=%s", (bid, self.userid))
+    #     self.conn.commit()
+    #     print("Booking canceled and room is now available.")
+
     def cancel_booking(self):
         cur = self.conn.cursor()
-        cur.execute("SELECT booking_id, room_no, check_in_date FROM booking WHERE userid=%s AND check_out_date IS NULL", (self.userid,))
+        cur.execute("""
+                    SELECT booking_id, room_no, check_in_date
+                    FROM booking
+                    WHERE userid = %s
+                      AND check_out_date IS NULL
+                    """, (self.userid,))
         bookings = cur.fetchall()
         if not bookings:
             print("No active bookings.")
             return
+
         print("\nYour Active Bookings:")
         for b in bookings:
             print(f"ID: {b[0]}, Room: {b[1]}, Check-in: {b[2]}")
         bid = int(input("Booking ID to cancel: "))
+
+        # Get the room number before deleting
+        cur.execute("SELECT room_no FROM booking WHERE booking_id = %s AND userid = %s", (bid, self.userid))
+        row = cur.fetchone()
+        if not row:
+            print("Invalid booking ID.")
+            return
+        room_no = row[0]
+
+        # Delete booking and update room availability
         cur.execute("DELETE FROM booking WHERE booking_id=%s AND userid=%s", (bid, self.userid))
+        cur.execute("UPDATE room SET is_avail = TRUE WHERE room_no = %s", (room_no,))
         self.conn.commit()
         print("Booking canceled and room is now available.")
 
@@ -150,13 +182,41 @@ class User:
         else:
             print("No bookings found.")
 
+    # def checkout(self):
+    #     cur = self.conn.cursor()
+    #     cur.execute("SELECT booking_id, room_no, check_in_date FROM booking WHERE userid=%s AND check_out_date IS NULL", (self.userid,))
+    #     bookings = cur.fetchall()
+    #     if not bookings:
+    #         print("No active bookings.")
+    #         return
+    #     print("\nYour Active Bookings:")
+    #     for b in bookings:
+    #         print(f"ID: {b[0]}, Room: {b[1]}, Check-in: {b[2]}")
+    #     bid = int(input("Booking ID to checkout: "))
+    #     checkout_date = input("Check-out Date (YYYY-MM-DD): ")
+    #     checkout_date_obj = datetime.strptime(checkout_date, "%Y-%m-%d").date()
+    #     print("Mark payment: 1. Paid  2. Unpaid")
+    #     choice = input("Choose: ")
+    #     status = 'Paid' if choice == '1' else 'Unpaid'
+    #
+    #     cur = self.conn.cursor()
+    #     cur.callproc("checkout_guest", [bid, checkout_date_obj, status, ''])
+    #     self.conn.commit()
+    #     print("Checkout successful.")
+
     def checkout(self):
         cur = self.conn.cursor()
-        cur.execute("SELECT booking_id, room_no, check_in_date FROM booking WHERE userid=%s AND check_out_date IS NULL", (self.userid,))
+        cur.execute("""
+                    SELECT booking_id, room_no, check_in_date
+                    FROM booking
+                    WHERE userid = %s
+                      AND check_out_date IS NULL
+                    """, (self.userid,))
         bookings = cur.fetchall()
         if not bookings:
             print("No active bookings.")
             return
+
         print("\nYour Active Bookings:")
         for b in bookings:
             print(f"ID: {b[0]}, Room: {b[1]}, Check-in: {b[2]}")
@@ -167,10 +227,13 @@ class User:
         choice = input("Choose: ")
         status = 'Paid' if choice == '1' else 'Unpaid'
 
-        cur = self.conn.cursor()
-        cur.callproc("checkout_guest", [bid, checkout_date_obj, status, ''])
+        # Call stored procedure and retrieve output
+        args = [bid, checkout_date_obj, status, '']
+        result_args = cur.callproc("checkout_guest", args)
+
         self.conn.commit()
-        print("Checkout successful.")
+        print(result_args[3])  # OUT parameter (result message)
+
 
 # Authentication
 def admin_login(connconn):
