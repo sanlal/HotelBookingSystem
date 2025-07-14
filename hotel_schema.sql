@@ -1,5 +1,3 @@
--- hotel_schema.sql
-
 DROP DATABASE IF EXISTS python_project;
 CREATE DATABASE python_project;
 USE python_project;
@@ -53,13 +51,11 @@ INSERT INTO admin (adminname, password) VALUES ('admin1', 'adminpass1');
 
 -- Triggers
 DELIMITER $$
-CREATE TRIGGER after_booking_insert
-AFTER INSERT ON booking
+CREATE TRIGGER after_booking_delete
+AFTER DELETE ON booking
 FOR EACH ROW
 BEGIN
-    IF NEW.check_out_date IS NULL THEN
-        UPDATE room SET is_avail = FALSE WHERE room_no = NEW.room_no;
-    END IF;
+    UPDATE room SET is_avail = TRUE WHERE room_no = OLD.room_no;
 END$$
 DELIMITER ;
 
@@ -86,39 +82,49 @@ END$$
 DELIMITER ;
 
 DELIMITER $$
-CREATE PROCEDURE checkout_guest(
+
+CREATE PROCEDURE checkout_guest (
     IN p_booking_id INT,
-    IN p_check_out_date DATE,
+    IN p_checkout_date DATE,
     IN p_payment_status VARCHAR(10),
-    OUT result VARCHAR(100)
+    OUT result VARCHAR(255)
 )
-BEGIN
-    DECLARE v_check_in DATE;
-    DECLARE v_room_price INT;
-    DECLARE v_days INT;
-    DECLARE v_amount INT;
+proc: BEGIN
+    DECLARE v_checkin_date DATE;
     DECLARE v_room_no INT;
+    DECLARE v_days INT;
+    DECLARE v_price_per_day INT;
+    DECLARE v_amount INT;
 
-    SELECT b.check_in_date, r.room_price, b.room_no INTO v_check_in, v_room_price, v_room_no
-    FROM booking b JOIN room r ON b.room_no = r.room_no
-    WHERE b.booking_id = p_booking_id;
+    -- Get check-in and room info
+    SELECT check_in_date, room_no INTO v_checkin_date, v_room_no
+    FROM booking
+    WHERE booking_id = p_booking_id;
 
-    IF v_check_in IS NOT NULL THEN
-        SET v_days = DATEDIFF(p_check_out_date, v_check_in);
-        SET v_amount = v_days * v_room_price;
-
-        START TRANSACTION;
-        UPDATE booking
-        SET check_out_date = p_check_out_date, amount = v_amount, payment_status = p_payment_status
-        WHERE booking_id = p_booking_id;
-
-        UPDATE room SET is_avail = TRUE WHERE room_no = v_room_no;
-        COMMIT;
-
-        SET result = CONCAT('Checkout successful. Total: ₹', v_amount, ', Status: ', p_payment_status);
-        -- add room to availability after successfull payment and checkout or cancel booking
-    ELSE
-        SET result = 'Booking ID not found.';
+    -- Calculate days and amount
+    SET v_days = DATEDIFF(p_checkout_date, v_checkin_date);
+    IF v_days <= 0 THEN
+        SET result = 'Invalid checkout date.';
+        LEAVE proc;
     END IF;
+
+    SELECT room_price INTO v_price_per_day FROM room WHERE room_no = v_room_no;
+    SET v_amount = v_days * v_price_per_day;
+
+    -- Update booking with checkout date, amount, payment status
+    UPDATE booking
+    SET check_out_date = p_checkout_date,
+        amount = v_amount,
+        payment_status = p_payment_status
+    WHERE booking_id = p_booking_id;
+
+    -- Set room available again
+    UPDATE room SET is_avail = TRUE WHERE room_no = v_room_no;
+
+    SET result = CONCAT('Checkout successful. Total: ₹', v_amount, ', Status: ', p_payment_status);
+
 END$$
+
+select * from booking;
 DELIMITER ;
+
