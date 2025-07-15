@@ -1,3 +1,5 @@
+#checkKarte
+
 import re
 import mysql.connector
 from mysql.connector import Error
@@ -6,8 +8,8 @@ from datetime import datetime, timedelta
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'santhor1',
-    'database': 'python_project'
+    'password': 'yourPass', #Your Password
+    'database': 'checkKarthe'
 }
 
 class Hotel:
@@ -78,6 +80,51 @@ class Admin:
             print("Payment status updated.")
         except Exception as e:
             print(f"Failed: {e}")
+
+    def view_bookings_by_period(self):
+        cur = self.conn.cursor()
+        print("\nView bookings for:")
+        print("1. Daily")
+        print("2. Monthly")
+        print("3. Yearly")
+        choice = input("Choose: ")
+
+        if choice == '1':
+            date_str = input("Enter date (YYYY-MM-DD): ").strip()
+            query = """
+                SELECT booking_id, userid, room_no, check_in_date, check_out_date, status
+                FROM booking
+                WHERE DATE(booking_date) = %s
+            """
+            cur.execute(query, (date_str,))
+        elif choice == '2':
+            month = input("Enter month (MM): ").strip()
+            year = input("Enter year (YYYY): ").strip()
+            query = """
+                SELECT booking_id, userid, room_no, check_in_date, check_out_date, status
+                FROM booking
+                WHERE MONTH(booking_date) = %s AND YEAR(booking_date) = %s
+            """
+            cur.execute(query, (month, year))
+        elif choice == '3':
+            year = input("Enter year (YYYY): ").strip()
+            query = """
+                SELECT booking_id, userid, room_no, check_in_date, check_out_date, status
+                FROM booking
+                WHERE YEAR(booking_date) = %s
+            """
+            cur.execute(query, (year,))
+        else:
+            print("Invalid choice.")
+            return
+
+        results = cur.fetchall()
+        print("\n--- Bookings Report ---")
+        for r in results:
+            print(f"ID: {r[0]}, UserID: {r[1]}, Room: {r[2]}, In: {r[3]}, Out: {r[4]}, Status: {r[5]}")
+        if not results:
+            print("No bookings found for the selected period.")
+
 
 class User:
     from collections import UserString
@@ -171,7 +218,10 @@ class User:
         room_no = row[0]
 
         # Delete booking and update room availability
-        cur.execute("DELETE FROM booking WHERE booking_id=%s AND userid=%s", (bid, self.userid))
+        # cur.execute("DELETE FROM booking WHERE booking_id=%s AND userid=%s", (bid, self.userid))
+        cur.execute("UPDATE booking SET status='Cancelled' WHERE booking_id=%s AND userid=%s",
+                    (bid, self.userid))
+
         cur.execute("UPDATE room SET is_avail = TRUE WHERE room_no = %s", (room_no,))
         self.conn.commit()
         print("Booking canceled and room is now available.")
@@ -350,6 +400,7 @@ def admin_menu(admin):
         print("1. View All Bookings")
         print("2. Add Room")
         print("3. Update Payment Status")
+        print("4. View Bookings Report")
         print("0. Logout")
         ch = input("Choose: ")
         if ch == '1':
@@ -358,6 +409,8 @@ def admin_menu(admin):
             admin.add_room()
         elif ch == '3':
             admin.update_payment_status()
+        elif ch == '4':
+            admin.view_bookings_by_period()
         elif ch == '0':
             break
         else:
