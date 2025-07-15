@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'Rishabh123',
+    'password': '805124',
     'database': 'python_project'
 }
 
@@ -80,6 +80,29 @@ class Admin:
             print(f"Failed: {e}")
 
 class User:
+    from collections import UserString
+    import string
+
+    class InvalidPasswordError(Exception):
+        pass
+
+    class SecurePassword(UserString):
+        def __init__(self, password):
+            super().__init__(password)
+            self.validate()
+
+        def validate(self):
+            if len(self.data) < 8:
+                raise User.InvalidPasswordError("Password must be at least 8 characters long.")
+            if not any(c in User.string.ascii_uppercase for c in self.data):
+                raise User.InvalidPasswordError("Password must include at least one uppercase letter.")
+            if not any(c in User.string.ascii_lowercase for c in self.data):
+                raise User.InvalidPasswordError("Password must include at least one lowercase letter.")
+            if not any(c in User.string.digits for c in self.data):
+                raise User.InvalidPasswordError("Password must include at least one digit.")
+            if not any(c not in User.string.ascii_letters + User.string.digits for c in self.data):
+                raise User.InvalidPasswordError("Password must include at least one special character.")
+
     def __init__(self, conn, userid, username):
         self.conn = conn
         self.userid = userid
@@ -202,14 +225,6 @@ def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email) is not None
 
-def is_strong_password(password):
-    return (
-        len(password) >= 8 and
-        any(c.isdigit() for c in password) and
-        any(c.isupper() for c in password) and
-        any(c.islower() for c in password)
-    )
-
 def is_valid_contact(contact):
     return contact.isdigit() and len(contact) == 10 and contact[0] in '6789'
 
@@ -239,16 +254,15 @@ def user_register(conn):
 
         while True:
             pwd = input("Password: ").strip()
-            if not is_strong_password(pwd):
-                print("Password must be at least 8 characters long and include uppercase, lowercase, and a number.")
-                continue
-
-            repeat_pwd = input("Repeat Password: ").strip()
-            if pwd != repeat_pwd:
-                print("Passwords do not match. Try again.")
-                continue
-
-            break
+            try:
+                secure_pwd = User.SecurePassword(pwd)
+                repeat_pwd = input("Repeat Password: ").strip()
+                if pwd != repeat_pwd:
+                    print("Passwords do not match. Try again.")
+                    continue
+                break
+            except User.InvalidPasswordError as e:
+                print(f"Invalid password: {e}")
 
         cur = conn.cursor()
         cur.execute("SELECT * FROM user WHERE email = %s", (email,))
