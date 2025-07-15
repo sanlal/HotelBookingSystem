@@ -95,36 +95,62 @@ proc: BEGIN
     DECLARE v_days INT;
     DECLARE v_price_per_day INT;
     DECLARE v_amount INT;
+    DECLARE v_exists INT;
+    DECLARE v_out DATE;
 
-    -- Get check-in and room info
-    SELECT check_in_date, room_no INTO v_checkin_date, v_room_no
-    FROM booking
-    WHERE booking_id = p_booking_id;
-
-    -- Calculate days and amount
-    SET v_days = DATEDIFF(p_checkout_date, v_checkin_date);
-    IF v_days <= 0 THEN
-        SET result = 'Invalid checkout date.';
+    -- check if booking exists
+    SELECT COUNT(*) INTO v_exists FROM booking WHERE booking_id = p_booking_id;
+    IF v_exists = 0 THEN
+        SET result = '❌ Booking ID does not exist.';
         LEAVE proc;
     END IF;
 
+    -- check if already checked out
+    SELECT check_out_date INTO v_out FROM booking WHERE booking_id = p_booking_id;
+    IF v_out IS NOT NULL THEN
+        SET result = '⚠️ Booking already completed.';
+        LEAVE proc;
+    END IF;
+
+    -- validate checkout date is today or future
+    IF p_checkout_date < CURDATE() THEN
+        SET result = '⛔ Checkout date must be today or in the future.';
+        LEAVE proc;
+    END IF;
+
+    -- get check-in and room info
+    SELECT check_in_date, room_no INTO v_checkin_date, v_room_no
+    FROM booking WHERE booking_id = p_booking_id;
+
+    -- calculate duration
+    SET v_days = DATEDIFF(p_checkout_date, v_checkin_date);
+    IF v_days <= 0 THEN
+        SET result = '❌ Invalid checkout date. Must be after check-in.';
+        LEAVE proc;
+    END IF;
+
+    -- calculate payment
     SELECT room_price INTO v_price_per_day FROM room WHERE room_no = v_room_no;
     SET v_amount = v_days * v_price_per_day;
 
-    -- Update booking with checkout date, amount, payment status
+    -- update booking info
     UPDATE booking
     SET check_out_date = p_checkout_date,
         amount = v_amount,
         payment_status = p_payment_status
     WHERE booking_id = p_booking_id;
 
-    -- Set room available again
+    -- mark room as available
     UPDATE room SET is_avail = TRUE WHERE room_no = v_room_no;
 
-    SET result = CONCAT('Checkout successful. Total: ₹', v_amount, ', Status: ', p_payment_status);
-
+    -- final result message
+    SET result = CONCAT('✅ Checkout successful. Total: ₹', v_amount, ', Status: ', p_payment_status);
 END$$
 
-select * from booking;
 DELIMITER ;
 
+DROP PROCEDURE IF EXISTS checkout_guest;
+
+select * from room;
+select * from user;
+select * from booking;
