@@ -1,6 +1,6 @@
-DROP DATABASE IF EXISTS python_project;
-CREATE DATABASE python_project;
-USE python_project;
+DROP DATABASE IF EXISTS checkKarthe;
+CREATE DATABASE checkKarthe;
+USE checkKarthe;
 
 -- Tables
 CREATE TABLE user (
@@ -150,6 +150,75 @@ END$$
 DELIMITER ;
 
 DROP PROCEDURE IF EXISTS checkout_guest;
+
+
+
+DROP PROCEDURE IF EXISTS checkout_guest;
+DELIMITER $$
+
+CREATE PROCEDURE checkout_guest (
+    IN p_booking_id INT,
+    IN p_checkout_date DATE,
+    IN p_payment_status VARCHAR(10),
+    OUT result VARCHAR(255)
+)
+proc: BEGIN
+    DECLARE v_checkin_date DATE;
+    DECLARE v_room_no INT;
+    DECLARE v_days INT;
+    DECLARE v_price_per_day INT;
+    DECLARE v_amount INT;
+    DECLARE v_exists INT;
+    DECLARE v_out DATE;
+
+    SELECT COUNT(*) INTO v_exists FROM booking WHERE booking_id = p_booking_id;
+    IF v_exists = 0 THEN
+        SET result = '❌ Booking ID does not exist.';
+        LEAVE proc;
+    END IF;
+
+    SELECT check_out_date INTO v_out FROM booking WHERE booking_id = p_booking_id;
+    IF v_out IS NOT NULL THEN
+        SET result = '⚠️ Booking already completed.';
+        LEAVE proc;
+    END IF;
+
+    IF p_checkout_date < CURDATE() THEN
+        SET result = '⛔ Checkout date must be today or in the future.';
+        LEAVE proc;
+    END IF;
+
+    SELECT check_in_date, room_no INTO v_checkin_date, v_room_no
+    FROM booking WHERE booking_id = p_booking_id;
+
+    SET v_days = DATEDIFF(p_checkout_date, v_checkin_date);
+    IF v_days <= 0 THEN
+        SET result = '❌ Invalid checkout date. Must be after check-in.';
+        LEAVE proc;
+    END IF;
+
+    SELECT room_price INTO v_price_per_day FROM room WHERE room_no = v_room_no;
+    SET v_amount = v_days * v_price_per_day;
+
+    UPDATE booking
+    SET check_out_date = p_checkout_date,
+        amount = v_amount,
+        payment_status = p_payment_status
+    WHERE booking_id = p_booking_id;
+
+    UPDATE room SET is_avail = TRUE WHERE room_no = v_room_no;
+
+    SET result = CONCAT('✅ Checkout successful. Total: ₹', v_amount, ', Status: ', p_payment_status);
+END$$
+DELIMITER ;
+
+
+alter table booking add status
+enum('Booked', 'Cancelled') default 'Booked';
+
+
+create INDEX idx_booking_date ON booking(booking_date);
+
 
 select * from room;
 select * from user;
