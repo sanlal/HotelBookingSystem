@@ -1,4 +1,3 @@
-
 import re
 import mysql.connector
 from mysql.connector import Error
@@ -287,27 +286,6 @@ def user_register(conn):
 
 
 
-
-# def user_register(conn):
-#     print("\n--- Register New User ---")
-#     try:
-#         uname = input("Username: ").strip()
-#         email = input("Email: ").strip()
-#         pwd = input("Password: ").strip()
-#         gender = input("Gender (M/F): ").strip().upper()
-#         dob = input("DOB (YYYY-MM-DD): ").strip()
-#         contact = input("Contact: ").strip()
-#         cur = conn.cursor()
-#         cur.execute("""
-#             INSERT INTO user(username, email, password, gender, dob, contact)
-#             VALUES(%s, %s, %s, %s, %s, %s)
-#         """, (uname, email, pwd, gender, dob, contact))
-#         conn.commit()
-#         print("Registration successful!")
-#     except mysql.connector.IntegrityError as e:
-#         print("Email already exists.")
-
-
 def user_login(conn):
     while True:
         email = input("Email: ").strip()
@@ -324,19 +302,6 @@ def user_login(conn):
     else:
         print("Invalid login.")
         return None
-
-# def user_login(conn):
-#     email = input("Email: ").strip()
-#     pwd = input("Password: ").strip()
-#     cur = conn.cursor()
-#     cur.execute("SELECT userid, username FROM user WHERE email=%s AND password=%s", (email, pwd))
-#     row = cur.fetchone()
-#     if row:
-#         print(f"\nWelcome {row[1]}!")
-#         return User(conn, row[0], row[1])
-#     else:
-#         print("Invalid login.")
-#         return None
 
 
 
