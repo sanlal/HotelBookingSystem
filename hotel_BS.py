@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '805124',
+    'password': 'santhor1',
     'database': 'python_project'
 }
 
