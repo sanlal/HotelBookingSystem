@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'yourPass', #Your Password
-    'database': 'checkKarthe'
+    'password': 'yourpass', #Your Password
+    'database': 'python_project'
 }
 
 class Hotel:
@@ -198,6 +198,7 @@ class User:
                     FROM booking
                     WHERE userid = %s
                       AND check_out_date IS NULL
+                      AND status != "Cancelled"
                     """, (self.userid,))
         bookings = cur.fetchall()
         if not bookings:
@@ -278,7 +279,7 @@ def is_valid_email(email):
 def is_valid_contact(contact):
     return contact.isdigit() and len(contact) == 10 and contact[0] in '6789'
 
-def admin_login(connconn):
+def admin_login(conn):
     uname = input("Admin name: ").strip()
     pwd = input("Password: ").strip()
     cur = conn.cursor()
